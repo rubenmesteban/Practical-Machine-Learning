@@ -1,0 +1,105 @@
+title: "Practical Machine Learning-Final Project"
+author: "Hsing-Yi"
+date: "2016¦~4¤ë5¤é"
+output: html_document
+---
+# Practical Machine Learning Course Project 
+## Executive Summary
+One thing that people regularly do is quantify how much of a particular activity they do, but they rarely quantify how well they do it. In this project, your goal will be to use data from accelerometers on the belt, forearm, arm, and dumbell of 6 participants.
+The goal of your project is to predict the manner in which they did the exercise. This is the "classe" variable in the training set. You may use any of the other variables to predict with. You should create a report describing how you built your model, how you used cross validation, what you think the expected out of sample error is, and why you made the choices you did. You will also use your prediction model to predict 20 different test cases.
+
+## Data Processing
+### Library Preparation
+```{r, results='hide'}
+library(dplyr)
+library(ggplot2)
+library(GGally)
+library(lattice)
+library(caret)
+library(e1071)
+library(kernlab)
+library(kknn)
+```
+
+### Data Loading and Exploratory Data Analysis
+```{r, cache=TRUE}
+fileUrl <- "https://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv?accessType=DOWNLOAD"
+download.file(fileUrl, destfile = "C:/Users/user/Documents/datasciencecouresa/pml-training.csv", method = "curl")
+training_ <- read.table("pml-training.csv", fill=TRUE, sep=",", header=TRUE, blank.lines.skip=TRUE)
+
+fileUrl <- "https://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv?accessType=DOWNLOAD"
+download.file(fileUrl, destfile = "C:/Users/user/Documents/datasciencecouresa/pml-testing.csv", method = "curl")
+testing_ <- read.table("pml-testing.csv", fill=TRUE, sep=",", header=TRUE, blank.lines.skip=TRUE)
+
+#str(training_)
+#summary(training_)
+```
+
+### Select Useful fields
+```{r}
+# Remove non-value attributes
+train_sel <- training_[, -(1:7)]
+
+# Remove NA attributes
+na_count <- sapply(train_sel, function(y) sum(length(which(is.na(y)))))
+train_sel <- train_sel[,(na_count==0)]
+
+# Remove dirty attributes
+zero_count <- sapply(train_sel, function(y) sum(length(which(y=="#DIV/0!"))))
+train_sel <- train_sel[,(zero_count==0)]
+
+# identify useful attributes
+classe <- train_sel$classe
+train_sel <- train_sel[,caret::findCorrelation(cor(train_sel[, 1:52]), cutoff=0.8)]
+train_sel <- cbind(train_sel, classe)
+
+# prepare test set
+test_sel <- testing_[,names(train_sel[1:13])]
+```
+
+
+### Modeling
+```{r, cache=TRUE, results='hide'}
+f <- as.formula(paste("classe ~", paste(names(train_sel)[!names(train_sel) %in% c("classe")], collapse = " + ")))
+
+## kknn
+kknn_m <- kknn(f, train_sel, test_sel, distance = 5,kernel = "triangular")
+fit <- fitted(kknn_m)
+fit
+
+## SVM
+svm_fit <- svm(f, data = train_sel)
+predict(svm_fit, test_sel)
+svm_fit ## SVM
+
+## rf
+rf_model<-train(f,data=train_sel ,method="rf")
+rf_model$results$Accuracy
+predict(rf_model, test_sel)
+
+## nnet
+NN_fit <- train(f, data = train_sel, method = "nnet", tuneLength = 2,  maxit = 30)
+max(NN_fit$results$Accuracy)
+predict(NN_fit, test_sel)
+
+```
+
+k-Nearest Neighbors 
+# kknn -- B A B A A E D C A A A C B A E E A B B B
+
+Support Vector Machine
+# svm  -- B A C A C E D C A A A C B A E E A B B B  
+
+Random Forest
+# rf   -- B A B A A E D C A A A C B A E E A B B B
+
+Neutral Network
+# NNfit-- A A A A A A C A A A A A D A C A A D A A
+
+
+## Conclusion
+Due to the best forecast accuracy is rf model : 97%. 
+And the rf forecast result is exactly the same as kknn
+
+The 20 test data prediction result is listed in below:
+B A B A A E D C A A A C B A E E A B B B
